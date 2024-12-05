@@ -5,49 +5,57 @@ import { Results } from './Results';
 import type { FormData } from './types';
 import { useLLMEngine } from '../hooks/useLLMEngine';
 
+type Status = {
+  state: 'idle' | 'engine-initializing' | 'generating' | 'error' | 'complete';
+  error?: string;
+};
+
 export const Home: React.FC = () => {
   const { generateResponse, engineLoaded } = useLLMEngine();
-  const [submitted, setSubmitted] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [response, setResponse] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<Status>({ state: 'idle' });
 
   const handleSubmit = async (data: FormData) => {
     setFormData(data);
-    setSubmitted(true);
-
+    console.log(formData);
+    
     if (!engineLoaded) {
-      setError("LLM engine is still initializing...");
+      setStatus({ 
+        state: 'engine-initializing', 
+        error: 'LLM engine is still initializing...' 
+      });
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    const result = await generateResponse(data.prompt);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setResponse(result.response);
+    try {
+      setStatus({ state: 'generating' });
+      // Change the below code with a prompt based on formData. data.prompt
+      const result = await generateResponse('Is the Earth flat?');
+      
+      if (result.error) {
+        setStatus({ state: 'error', error: result.error });
+      } else {
+        setResponse(result.response);
+        setStatus({ state: 'complete' });
+      }
+    } catch (err) {
+      setStatus({ 
+        state: 'error', 
+        error: err instanceof Error ? err.message : 'An unexpected error occurred' 
+      });
     }
-
-    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      {!submitted ? (
+      {status.state === 'idle' ? (
         <UserForm onSubmit={handleSubmit} />
       ) : (
-        formData && (
-          <Results
-            data={formData}
-            response={response}
-            loading={loading}
-            error={error}
-          />
-        )
+        <Results
+          data={response}
+          status={status}
+        />
       )}
     </div>
   );
